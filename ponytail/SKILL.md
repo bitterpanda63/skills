@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change, tests in their own file (never inline), plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
+description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
 ---
 
 # ponytail
@@ -39,6 +39,21 @@ or fewer new abstractions - even if the other felt more thorough or "correct" wh
   don't design for hypothetical future requirements (see global CLAUDE.md's "no beyond-task
   abstractions" rule - this is the same principle, applied as an explicit check step)
 
+## readability: the 30-second test
+
+for each changed or added file, ask: could someone unfamiliar with it follow this in about
+30 seconds? soft signals, not hard fails - judgment still applies, especially for new files
+(see below):
+- a function running long (~40+ lines) without a clear reason to be one function
+- conditionals nested 3+ levels deep
+- a magic number/string where a named constant would explain itself
+- a clever one-liner that trades clarity for cleverness
+- an unclear variable name where a clearer one costs nothing
+
+new files get more benefit of the doubt than changes threaded into existing, working code:
+a new module can carry more inherent complexity before any of the above is worth flagging,
+since there's no existing structure or reader expectation it's disrupting.
+
 ## scope: don't let the diff explode
 
 a task has an implicit boundary - the bug, the review comment, the feature asked for. stay
@@ -57,6 +72,10 @@ never `#[cfg(test)] mod tests { ... }` inline in a Rust file; tests always live 
 file. naming/wiring convention varies by repo - match the sibling test files already there
 rather than inventing a new layout. same principle in other languages: prefer the project's
 existing test-file convention over inlining test code next to implementation.
+
+before writing new tests, look at how similar existing code is already tested (same kind of
+test - unit/integration/e2e - and the same coverage style) and match that, rather than
+inventing a new testing approach for this one change.
 
 test *scope* should match the change, not sprawl past it:
 - cover the new behavior and its realistic edge cases, not every theoretically possible
