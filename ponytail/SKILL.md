@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
+description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), keeping SQL and query-builder calls out of controllers/routes and inside the repository layer, plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, writing or reviewing a controller/route handler that touches the database, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
 ---
 
 # ponytail
@@ -84,6 +84,20 @@ test *scope* should match the change, not sprawl past it:
   existing test suite as a side effect of adding new tests
 - if the right-sized test count for a change feels like "a lot," that's usually a sign the
   change itself is doing more than the task asked - reconsider the change's scope first
+
+## data access: sql lives in repositories, never in controllers
+
+for any codebase with a controller/route layer and a repository/data-access layer, queries
+belong only in the repository layer - raw SQL strings and ORM query builders alike.
+
+- a controller/route handler parses input, calls a repository function, and shapes the
+  reply - it never issues a query (raw SQL or `db.select()/getDb()`-style builder calls)
+  directly against the database
+- if a route needs a lookup a repository doesn't yet expose, add or extend a repository
+  function for it rather than reaching for the db client inline - check for an existing
+  repository function first, since the lookup may already exist
+- this applies even for "just a quick lookup" (e.g. resolving an id before a 404 check) -
+  small one-off queries are exactly the ones that end up duplicated across route files
 
 ## plans: editable plan.md, not the approval dialog
 
