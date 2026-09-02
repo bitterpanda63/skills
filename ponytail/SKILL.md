@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), keeping SQL and query-builder calls out of controllers/routes and inside the repository layer, plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, writing or reviewing a controller/route handler that touches the database, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
+description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, catching a guard/condition duplicated across a caller and callee instead of living in one place, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), keeping SQL and query-builder calls out of controllers/routes and inside the repository layer, plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, writing or reviewing a controller/route handler that touches the database, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
 ---
 
 # ponytail
@@ -38,6 +38,21 @@ or fewer new abstractions - even if the other felt more thorough or "correct" wh
 - a bug fix doesn't need surrounding cleanup; a one-shot operation doesn't need a helper;
   don't design for hypothetical future requirements (see global CLAUDE.md's "no beyond-task
   abstractions" rule - this is the same principle, applied as an explicit check step)
+
+## duplicated guards: one invariant, one place
+
+when a diff adds a condition that decides *whether* something happens (a filter, an early
+return, a `some()`/`any()` check), trace it forward to where the thing being gated is used -
+if the callee already checks the same condition, that's one invariant enforced twice, and the
+two will drift.
+
+- reading each guard in isolation and asking "is this the simplest way to write *this line*"
+  isn't enough - the question is whether this condition already exists somewhere else in the
+  call chain
+- a giveaway: a caller pre-filtering/pre-checking a list right before handing it to a function
+  that immediately loops over it and filters/checks again
+- fix by collapsing to one place, usually the callee (it's the one that actually needs the
+  invariant to hold), and letting the caller call unconditionally
 
 ## readability: the 30-second test
 
