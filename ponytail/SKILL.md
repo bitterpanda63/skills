@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, catching a guard/condition duplicated across a caller and callee instead of living in one place, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), keeping SQL and query-builder calls out of controllers/routes and inside the repository layer, plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, writing or reviewing a controller/route handler that touches the database, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
+description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, catching a guard/condition duplicated across a caller and callee instead of living in one place, spelling out byte-size constants instead of bit-shifting them, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), keeping SQL and query-builder calls out of controllers/routes and inside the repository layer, plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, writing or reviewing a controller/route handler that touches the database, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
 ---
 
 # ponytail
@@ -68,6 +68,19 @@ for each changed or added file, ask: could someone unfamiliar with it follow thi
 new files get more benefit of the doubt than changes threaded into existing, working code:
 a new module can carry more inherent complexity before any of the above is worth flagging,
 since there's no existing structure or reader expectation it's disrupting.
+
+## byte sizes: spell them out, don't bit-shift
+
+`8 << 20` reads as a shift operation, not "8 MiB" - correct only after doing the math in
+your head. write `8 * 1024 * 1024` instead, with a `// 8 MiB` comment if the unit isn't
+already obvious from the constant's name.
+
+- reserve `<<`/`>>` for real bitwise work (flags, masks, protocol fields), never as a
+  terse way to spell a size
+- same principle for any literal that encodes a unit the reader has to convert in their
+  head - name the constant or comment the unit rather than making them do the arithmetic
+- if the file (or repo) already has a size-constant convention, match it instead of
+  introducing a second style
 
 ## scope: don't let the diff explode
 
