@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, catching a guard/condition duplicated across a caller and callee instead of living in one place, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), keeping SQL and query-builder calls out of controllers/routes and inside the repository layer, plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, writing or reviewing a controller/route handler that touches the database, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
+description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, matching a file's existing `return await` convention rather than applying a local redundant-await simplification, catching a guard/condition duplicated across a caller and callee instead of living in one place, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), keeping SQL and query-builder calls out of controllers/routes and inside the repository layer, plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, writing or reviewing a controller/route handler that touches the database, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
 ---
 
 # ponytail
@@ -38,6 +38,21 @@ or fewer new abstractions - even if the other felt more thorough or "correct" wh
 - a bug fix doesn't need surrounding cleanup; a one-shot operation doesn't need a helper;
   don't design for hypothetical future requirements (see global CLAUDE.md's "no beyond-task
   abstractions" rule - this is the same principle, applied as an explicit check step)
+
+## return await: match the file's existing convention
+
+`return await x(...)` and `return x(...)` behave the same on the happy path, but not on
+rejection: with `await`, the current async function's frame stays on the stack and shows up
+in the trace; without it, the rejection propagates straight through. an automated reviewer
+flagging the `await` as redundant is only looking at the one function - it isn't redundant if
+the rest of the file (or repo) already uses `return await x(...)` as the pattern for this
+shape of call.
+
+- before applying a "drop the redundant await" suggestion, grep the file/repo for the same
+  shape - if it's already the established convention, matching it wins over the local,
+  single-function simplification
+- cuts both ways: don't introduce `return await` somewhere nothing else in the file uses it
+  either - match what's already there, in whichever direction that goes
 
 ## duplicated guards: one invariant, one place
 
