@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, matching a file's existing `return await` convention rather than applying a local redundant-await simplification, catching a guard/condition duplicated across a caller and callee instead of living in one place, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), keeping SQL and query-builder calls out of controllers/routes and inside the repository layer, plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, writing or reviewing a controller/route handler that touches the database, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
+description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, tests in their own file, scope discipline on diffs, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, or writing/reviewing a controller/route handler that touches the database.
 ---
 
 # ponytail
@@ -41,18 +41,18 @@ or fewer new abstractions - even if the other felt more thorough or "correct" wh
 
 ## return await: match the file's existing convention
 
-`return await x(...)` and `return x(...)` behave the same on the happy path, but not on
-rejection: with `await`, the current async function's frame stays on the stack and shows up
-in the trace; without it, the rejection propagates straight through. an automated reviewer
-flagging the `await` as redundant is only looking at the one function - it isn't redundant if
-the rest of the file (or repo) already uses `return await x(...)` as the pattern for this
-shape of call.
+- `return await x(...)` vs `return x(...)`: same result, but `await` keeps this function's
+  frame in the stack trace on rejection
+- before dropping a "redundant" await, grep the file/repo for the same shape first -
+  if it's already the convention there, match it instead of locally optimizing it away
 
-- before applying a "drop the redundant await" suggestion, grep the file/repo for the same
-  shape - if it's already the established convention, matching it wins over the local,
-  single-function simplification
-- cuts both ways: don't introduce `return await` somewhere nothing else in the file uses it
-  either - match what's already there, in whichever direction that goes
+## ternaries: avoid `cond ? a : b`
+
+- prefer `if`/`else` over a ternary - reads slower, and unreadable fast once nested
+- `.map()`/`.forEach()`/a plain `for` loop are all fine; the objection is the ternary
+  operator, not the loop construct
+- a fallback default (`a ?? b`) is fine as its own line; don't cram it into a bigger
+  expression (e.g. inside an object literal alongside other fields)
 
 ## duplicated guards: one invariant, one place
 
