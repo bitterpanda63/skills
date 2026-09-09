@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, tests in their own file, scope discipline on diffs, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, or writing/reviewing a controller/route handler that touches the database.
+description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, one route per controller file, tests in their own file, scope discipline on diffs, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, or writing/reviewing a controller/route handler that touches the database.
 ---
 
 # ponytail
@@ -128,6 +128,21 @@ belong only in the repository layer - raw SQL strings and ORM query builders ali
   repository function first, since the lookup may already exist
 - this applies even for "just a quick lookup" (e.g. resolving an id before a 404 check) -
   small one-off queries are exactly the ones that end up duplicated across route files
+
+## controllers: one route per file
+
+a controller/route file registers exactly one endpoint. two handlers in one file isn't a
+"related routes" convenience, it's a file you have to read in full to find the one handler
+you came for.
+
+- split on the route, not the resource - a collection endpoint and its `/:id` endpoint are
+  two files even when they share a url prefix, a feature flag and a repository
+- name each file after the registration function it exports, and register each separately
+  wherever the app wires its routes up
+- parsing/shaping the two would otherwise share goes in a `<feature>/<helper>.ts` beside
+  them, not in whichever route file was written first
+- a short guard both routes repeat (a feature-flag check, an auth precondition) is fine
+  duplicated across the two files; don't add a wrapper to dedupe three lines
 
 ## plans: editable plan.md, not the approval dialog
 
