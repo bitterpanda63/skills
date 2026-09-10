@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, one route per controller file, unique keys defined together with their table in schema files, tests in their own file, scope discipline on diffs, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, or writing/reviewing a controller/route handler that touches the database.
+description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, one route per controller file, unique keys defined together with their table in schema files, tests in their own file, scope discipline on diffs, caution and a test list when changing a widely used base component, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, changing a shared base UI component, or writing/reviewing a controller/route handler that touches the database.
 ---
 
 # ponytail
@@ -95,6 +95,27 @@ inside it.
   files belong in a separate call-out to the user, not folded silently into the diff
 - if a fix reveals a second, adjacent problem, surface it and ask rather than expanding
   the diff to cover it unasked
+
+## base components: changes spread everywhere they're used
+
+a base component (e.g. aikido-core's `Base*` components in `client/src/components/atoms/`,
+like `BaseButton`) is shared by many screens. one change to it changes every place that
+uses it, including screens the task never touched.
+
+- before editing a base component, confirm the change is intended for every usage, not
+  just the screen you're working on
+- the more places use it, the higher the bar; count the usages first (grep the component
+  name) and say how many there are
+- after any base component change, always write a list of what to test: every screen or
+  component that uses it, grouped so it can actually be clicked through
+- if that list is too big to realistically test, the change is probably the wrong one;
+  don't make it
+- look for an easier fix first:
+  - a prop or variant that only the screen being fixed opts into
+  - a local style or wrapper in the screen being fixed
+  - a new component for the new case, leaving the base one as is
+- only change the base component itself when every usage really should change, and say
+  so explicitly in the PR/summary along with the test list
 
 ## tests: separate file, right-sized
 
