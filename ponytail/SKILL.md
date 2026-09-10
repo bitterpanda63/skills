@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments that usually run ~1-2 lines, preferring the simplest fix that works, catching a guard/condition duplicated across a caller and callee instead of living in one place, spelling out byte-size constants instead of bit-shifting them, a 30-second readability bar (function length, nesting depth, magic numbers, no clever one-liners - lenient for new files), keeping a PR/diff's scope from creeping beyond the task, right-sizing test coverage to the change and matching existing test style, tests in their own file (never inline), keeping SQL and query-builder calls out of controllers/routes and inside the repository layer, plans written as an editable plan.md instead of the ExitPlanMode dialog, and flagging unsourced inferences as guesses rather than facts. Load before writing comments/docstrings, adding tests, entering plan mode, writing or reviewing a controller/route handler that touches the database, stating how undocumented/internal behavior works, or wrapping up a PR/diff.
+description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, one route per controller file, unique keys defined together with their table in schema files, tests in their own file, scope discipline on diffs, caution and a test list when changing a widely used base component, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, changing a shared base UI component, or writing/reviewing a controller/route handler that touches the database.
 ---
 
 # ponytail
@@ -39,6 +39,21 @@ or fewer new abstractions - even if the other felt more thorough or "correct" wh
   don't design for hypothetical future requirements (see global CLAUDE.md's "no beyond-task
   abstractions" rule - this is the same principle, applied as an explicit check step)
 
+## return await: match the file's existing convention
+
+- `return await x(...)` vs `return x(...)`: same result, but `await` keeps this function's
+  frame in the stack trace on rejection
+- before dropping a "redundant" await, grep the file/repo for the same shape first -
+  if it's already the convention there, match it instead of locally optimizing it away
+
+## ternaries: avoid `cond ? a : b`
+
+- prefer `if`/`else` over a ternary - reads slower, and unreadable fast once nested
+- `.map()`/`.forEach()`/a plain `for` loop are all fine; the objection is the ternary
+  operator, not the loop construct
+- a fallback default (`a ?? b`) is fine as its own line; don't cram it into a bigger
+  expression (e.g. inside an object literal alongside other fields)
+
 ## duplicated guards: one invariant, one place
 
 when a diff adds a condition that decides *whether* something happens (a filter, an early
@@ -64,23 +79,12 @@ for each changed or added file, ask: could someone unfamiliar with it follow thi
 - a magic number/string where a named constant would explain itself
 - a clever one-liner that trades clarity for cleverness
 - an unclear variable name where a clearer one costs nothing
+- a byte size written as a bit-shift (`8 << 20`) instead of `8 * 1024 * 1024`; keep
+  `<<`/`>>` for real bitwise work (flags, masks)
 
 new files get more benefit of the doubt than changes threaded into existing, working code:
 a new module can carry more inherent complexity before any of the above is worth flagging,
 since there's no existing structure or reader expectation it's disrupting.
-
-## byte sizes: spell them out, don't bit-shift
-
-`8 << 20` reads as a shift operation, not "8 MiB" - correct only after doing the math in
-your head. write `8 * 1024 * 1024` instead, with a `// 8 MiB` comment if the unit isn't
-already obvious from the constant's name.
-
-- reserve `<<`/`>>` for real bitwise work (flags, masks, protocol fields), never as a
-  terse way to spell a size
-- same principle for any literal that encodes a unit the reader has to convert in their
-  head - name the constant or comment the unit rather than making them do the arithmetic
-- if the file (or repo) already has a size-constant convention, match it instead of
-  introducing a second style
 
 ## scope: don't let the diff explode
 
@@ -93,6 +97,27 @@ inside it.
   files belong in a separate call-out to the user, not folded silently into the diff
 - if a fix reveals a second, adjacent problem, surface it and ask rather than expanding
   the diff to cover it unasked
+
+## base components: changes spread everywhere they're used
+
+a base component (e.g. aikido-core's `Base*` components in `client/src/components/atoms/`,
+like `BaseButton`) is shared by many screens. one change to it changes every place that
+uses it, including screens the task never touched.
+
+- before editing a base component, confirm the change is intended for every usage, not
+  just the screen you're working on
+- the more places use it, the higher the bar; count the usages first (grep the component
+  name) and say how many there are
+- after any base component change, always write a list of what to test: every screen or
+  component that uses it, grouped so it can actually be clicked through
+- if that list is too big to realistically test, the change is probably the wrong one;
+  don't make it
+- look for an easier fix first:
+  - a prop or variant that only the screen being fixed opts into
+  - a local style or wrapper in the screen being fixed
+  - a new component for the new case, leaving the base one as is
+- only change the base component itself when every usage really should change, and say
+  so explicitly in the PR/summary along with the test list
 
 ## tests: separate file, right-sized
 
@@ -126,6 +151,37 @@ belong only in the repository layer - raw SQL strings and ORM query builders ali
   repository function first, since the lookup may already exist
 - this applies even for "just a quick lookup" (e.g. resolving an id before a 404 check) -
   small one-off queries are exactly the ones that end up duplicated across route files
+
+## controllers: one route per file
+
+a controller/route file registers exactly one endpoint. two handlers in one file isn't a
+"related routes" convenience, it's a file you have to read in full to find the one handler
+you came for.
+
+- split on the route, not the resource - a collection endpoint and its `/:id` endpoint are
+  two files even when they share a url prefix, a feature flag and a repository
+- name each file after the registration function it exports, and register each separately
+  wherever the app wires its routes up
+- parsing/shaping the two would otherwise share goes in a `<feature>/<helper>.ts` beside
+  them, not in whichever route file was written first
+- a short guard both routes repeat (a feature-flag check, an auth precondition) is fine
+  duplicated across the two files; don't add a wrapper to dedupe three lines
+
+## schema files: define unique keys together with the table
+
+in a schema file (e.g. `schema.sql`), a table's unique keys go right after that table's
+`CREATE TABLE`, before the next table. never gather them in a separate block at the end
+of the file.
+
+- order per table: `CREATE TABLE`, then that table's `CREATE UNIQUE INDEX` (postgres) or
+  `ALTER TABLE ... ADD UNIQUE KEY` (mysql), then the next table
+- reference: aikido-core's `docs/mysql/aikido.sql`; every `CREATE TABLE` there is followed
+  by an `ALTER TABLE` block holding that same table's keys
+- adding a table: write its unique keys with it, in the same place
+- adding a unique key to an existing table: put it after that table, even if the file
+  already collects keys at the bottom
+- why: reading one table's definition should show which columns are unique, without
+  searching the rest of the file
 
 ## plans: editable plan.md, not the approval dialog
 
