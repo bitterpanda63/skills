@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, one route per controller file, tests in their own file, scope discipline on diffs, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, or writing/reviewing a controller/route handler that touches the database.
+description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, one route per controller file, unique keys defined next to their table in schema files, tests in their own file, scope discipline on diffs, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, or writing/reviewing a controller/route handler that touches the database.
 ---
 
 # ponytail
@@ -143,6 +143,23 @@ you came for.
   them, not in whichever route file was written first
 - a short guard both routes repeat (a feature-flag check, an auth precondition) is fine
   duplicated across the two files; don't add a wrapper to dedupe three lines
+
+## schema files: unique keys live next to their table
+
+in a hand-maintained schema file (`schema.sql`, a mysql dump, ...), a table's unique keys
+sit directly below that table's `CREATE TABLE`, not collected in a block at the bottom of
+the file.
+
+- reading one table's definition should show which columns are unique without searching
+  the whole file
+- order per table: `CREATE TABLE`, then its `CREATE UNIQUE INDEX` / `ADD UNIQUE KEY`
+  lines, then the next table
+- reference: aikido-core's `docs/mysql/aikido.sql` follows each `CREATE TABLE` with an
+  `ALTER TABLE ... ADD PRIMARY KEY / ADD UNIQUE KEY / ADD KEY` block for that table
+- when adding a table, put its keys with it; when adding a key to an existing table, put it
+  with that table, even if the file already has a bottom-of-file key dump
+- plain indexes and foreign keys follow the same rule; keep every statement about one table
+  in one place
 
 ## plans: editable plan.md, not the approval dialog
 
