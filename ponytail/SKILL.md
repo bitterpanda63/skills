@@ -79,6 +79,8 @@ for each changed or added file, ask: could someone unfamiliar with it follow thi
 - a magic number/string where a named constant would explain itself
 - a clever one-liner that trades clarity for cleverness
 - an unclear variable name where a clearer one costs nothing
+- a byte size written as a bit-shift (`8 << 20`) instead of `8 * 1024 * 1024`; keep
+  `<<`/`>>` for real bitwise work (flags, masks)
 
 new files get more benefit of the doubt than changes threaded into existing, working code:
 a new module can carry more inherent complexity before any of the above is worth flagging,
