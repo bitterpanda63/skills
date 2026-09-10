@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, one route per controller file, tests in their own file, scope discipline on diffs, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, or writing/reviewing a controller/route handler that touches the database.
+description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, one route per controller file, unique keys defined together with their table in schema files, tests in their own file, scope discipline on diffs, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, or writing/reviewing a controller/route handler that touches the database.
 ---
 
 # ponytail
@@ -143,6 +143,22 @@ you came for.
   them, not in whichever route file was written first
 - a short guard both routes repeat (a feature-flag check, an auth precondition) is fine
   duplicated across the two files; don't add a wrapper to dedupe three lines
+
+## schema files: define unique keys together with the table
+
+in a schema file (e.g. `schema.sql`), a table's unique keys go right after that table's
+`CREATE TABLE`, before the next table. never gather them in a separate block at the end
+of the file.
+
+- order per table: `CREATE TABLE`, then that table's `CREATE UNIQUE INDEX` (postgres) or
+  `ALTER TABLE ... ADD UNIQUE KEY` (mysql), then the next table
+- reference: aikido-core's `docs/mysql/aikido.sql`; every `CREATE TABLE` there is followed
+  by an `ALTER TABLE` block holding that same table's keys
+- adding a table: write its unique keys with it, in the same place
+- adding a unique key to an existing table: put it after that table, even if the file
+  already collects keys at the bottom
+- why: reading one table's definition should show which columns are unique, without
+  searching the rest of the file
 
 ## plans: editable plan.md, not the approval dialog
 
