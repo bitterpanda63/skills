@@ -66,8 +66,6 @@ of the file.
 
 - order per table: `CREATE TABLE`, then that table's `CREATE UNIQUE INDEX` (postgres) or
   `ALTER TABLE ... ADD UNIQUE KEY` (mysql), then the next table
-- reference: aikido-core's `docs/mysql/aikido.sql`; every `CREATE TABLE` there is followed
-  by an `ALTER TABLE` block holding that same table's keys
 - adding a table: write its unique keys with it, in the same place
 - adding a unique key to an existing table: put it after that table, even if the file
   already collects keys at the bottom
