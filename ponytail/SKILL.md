@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL (and only SQL) in the repository layer and how queries are written (named params, tenant scoping, bounded lists, bulk writes), one route per controller file, unique keys defined together with their table in schema files, tests in their own file, scope discipline on diffs, caution and a test list when changing a widely used base component, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, changing a shared base UI component, or writing/reviewing SQL or a controller/route handler that touches the database.
+description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, one route per controller file, tests in their own file, scope discipline on diffs, caution and a test list when changing a widely used base component, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, keeping failure behavior when swapping a data source, and more added over time). SQL rules live in the separate ponytail-sql skill. Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, changing a shared base UI component, or writing/reviewing a controller/route handler.
 ---
 
 # ponytail
@@ -53,6 +53,9 @@ or fewer new abstractions - even if the other felt more thorough or "correct" wh
   operator, not the loop construct
 - a fallback default (`a ?? b`) is fine as its own line; don't cram it into a bigger
   expression (e.g. inside an object literal alongside other fields)
+- `flatMap((x) => cond ? [y] : [])` is a ternary doing a filter and a map at once; it also
+  hides that items are being dropped. write the `if` out, and ask whether dropping is right
+  (see failure behavior below)
 
 ## duplicated guards: one invariant, one place
 
@@ -68,6 +71,23 @@ two will drift.
   that immediately loops over it and filters/checks again
 - fix by collapsing to one place, usually the callee (it's the one that actually needs the
   invariant to hold), and letting the caller call unconditionally
+
+## swapping a data source: keep its failure behavior
+
+when a change moves a read to a new source (db → s3, cache → api, sync job → direct fetch),
+the happy path usually matches. what drifts is what happens when the source is missing,
+empty or erroring.
+
+- before calling it done, write down what the old and the new path each do for: missing,
+  empty, erroring. compare them side by side
+- the old path's fallback often lives somewhere else (a sync job that keeps the last good
+  copy, a `WHERE count > 0` in a query); find it, don't assume
+- the tell is a new branch that skips an item when its source isn't there. for a block/deny
+  rule, silently leaving it out is fail-open
+- if the old path kept serving the last good data, the new one must fail the request rather
+  than return a quietly smaller result
+- "same as the old X" is a claim; check it against the old code before saying it (see
+  claims)
 
 ## readability: the 30-second test
 
@@ -138,54 +158,11 @@ test *scope* should match the change, not sprawl past it:
 - if the right-sized test count for a change feels like "a lot," that's usually a sign the
   change itself is doing more than the task asked - reconsider the change's scope first
 
-## data access: sql lives in repositories, never in controllers
+## sql: load ponytail-sql
 
-for any codebase with a controller/route layer and a repository/data-access layer, queries
-belong only in the repository layer - raw SQL strings and ORM query builders alike.
-
-- a controller/route handler parses input, calls a repository function, and shapes the
-  reply - it never issues a query (raw SQL or `db.select()/getDb()`-style builder calls)
-  directly against the database
-- if a route needs a lookup a repository doesn't yet expose, add or extend a repository
-  function for it rather than reaching for the db client inline - check for an existing
-  repository function first, since the lookup may already exist
-- this applies even for "just a quick lookup" (e.g. resolving an id before a 404 check) -
-  small one-off queries are exactly the ones that end up duplicated across route files
-- the layer is queries only, in both directions: no service, store or tool holds a db client or
-  a query string (a bulk insert and a table of query templates count), and a repository function
-  runs one query and returns rows; deduplicating, merging, defaulting, policy and building the
-  rows to write live in the service/store that calls it
-
-## sql patterns: how a query is written
-
-applies to any dialect. examples come from endpoint-server's repositories (postgres, `:name`
-placeholders); clickhouse says `{name:Type}` instead.
-
-- named parameters only: values are never concatenated or template-interpolated into the SQL
-  text. a `${...}` inside a query is only a fragment assembled from fixed strings (an optional
-  filter, a `VALUES` row list, a shared predicate constant) whose values went into the params
-  object beside it
-- scope by tenant on every tenant-owned table, joined tables included
-  (`ON d.id = t.device_id AND d.sys_group_id = :sysGroupId`), and take the tenant id as an
-  explicit repository argument. a cross-tenant query (global table, fleet-wide analytics) is the
-  deliberate exception; make that obvious from the function name or a comment
-- name the columns you select instead of `SELECT *`; the exception is copying a row forward
-  unchanged (re-inserting into a replacing table), where `*` stops a column added later from
-  being reset to its default
-- bound every list query with `LIMIT`, and end its `ORDER BY` in a unique column so ties don't
-  make pages or cursors skip or repeat rows; a lookup expecting one row says `LIMIT 1`
-- push filters into the query: build optional conditions as a list of fixed strings
-  (`AND ip.ecosystem = :ecosystem`) and add their values to params, rather than fetching
-  broadly and filtering in the caller
-- write in bulk, one statement per batch and never one per row (a row per round trip puts
-  dozens of serial queries on the request path). keep a batch under the driver's bind-parameter
-  limit (postgres: 65535, so chunk a multi-row `VALUES`), or pass parallel arrays and
-  `unnest(:a::text[], :b::int[])` so the parameter count stays flat
-- upserts name their conflict target (`ON CONFLICT (cols) DO UPDATE SET x = EXCLUDED.x`, or
-  `DO NOTHING`). postgres rejects a statement that hits the same row twice, so the caller
-  dedupes the batch first; say so on the function
-- cast aggregates in the query (`count(*)::int`); the driver hands bigint back as a string
-- `RETURNING id` when the caller needs the new id or needs to know a row matched
+any time SQL comes into play (writing or reviewing a query, a repository function, a schema
+file, or a controller/route handler that touches the database), also load the `ponytail-sql`
+skill; its rules live there, not here.
 
 ## controllers: one route per file
 
@@ -201,22 +178,6 @@ you came for.
   them, not in whichever route file was written first
 - a short guard both routes repeat (a feature-flag check, an auth precondition) is fine
   duplicated across the two files; don't add a wrapper to dedupe three lines
-
-## schema files: define unique keys together with the table
-
-in a schema file (e.g. `schema.sql`), a table's unique keys go right after that table's
-`CREATE TABLE`, before the next table. never gather them in a separate block at the end
-of the file.
-
-- order per table: `CREATE TABLE`, then that table's `CREATE UNIQUE INDEX` (postgres) or
-  `ALTER TABLE ... ADD UNIQUE KEY` (mysql), then the next table
-- reference: aikido-core's `docs/mysql/aikido.sql`; every `CREATE TABLE` there is followed
-  by an `ALTER TABLE` block holding that same table's keys
-- adding a table: write its unique keys with it, in the same place
-- adding a unique key to an existing table: put it after that table, even if the file
-  already collects keys at the bottom
-- why: reading one table's definition should show which columns are unique, without
-  searching the rest of the file
 
 ## plans: editable plan.md, not the approval dialog
 
