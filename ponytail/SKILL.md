@@ -120,8 +120,7 @@ inside it.
 
 ## base components: changes spread everywhere they're used
 
-a base component (e.g. aikido-core's `Base*` components in `client/src/components/atoms/`,
-like `BaseButton`) is shared by many screens. one change to it changes every place that
+a base component is shared by many screens. one change to it changes every place that
 uses it, including screens the task never touched.
 
 - before editing a base component, confirm the change is intended for every usage, not
