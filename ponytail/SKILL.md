@@ -1,6 +1,6 @@
 ---
 name: ponytail
-description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL in the repository layer, one route per controller file, unique keys defined together with their table in schema files, tests in their own file, scope discipline on diffs, caution and a test list when changing a widely used base component, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, changing a shared base UI component, or writing/reviewing a controller/route handler that touches the database.
+description: Personal cross-project working-style preferences - terse devspeak comments, preferring the simplest fix, keeping SQL (and only SQL) in the repository layer and how queries are written (named params, tenant scoping, bounded lists, bulk writes), one route per controller file, unique keys defined together with their table in schema files, tests in their own file, scope discipline on diffs, caution and a test list when changing a widely used base component, an editable plan.md over the ExitPlanMode dialog, and sourcing claims - plus a growing list of code-quality checks (duplicated guards, ternary avoidance, return-await conventions, byte-size constants over bit-shifts, and more added over time). Load before writing comments/docstrings, adding tests, entering plan mode, reviewing a diff for style or quality issues, changing a shared base UI component, or writing/reviewing SQL or a controller/route handler that touches the database.
 ---
 
 # ponytail
@@ -151,6 +151,41 @@ belong only in the repository layer - raw SQL strings and ORM query builders ali
   repository function first, since the lookup may already exist
 - this applies even for "just a quick lookup" (e.g. resolving an id before a 404 check) -
   small one-off queries are exactly the ones that end up duplicated across route files
+- the layer is queries only, in both directions: no service, store or tool holds a db client or
+  a query string (a bulk insert and a table of query templates count), and a repository function
+  runs one query and returns rows; deduplicating, merging, defaulting, policy and building the
+  rows to write live in the service/store that calls it
+
+## sql patterns: how a query is written
+
+applies to any dialect. examples come from endpoint-server's repositories (postgres, `:name`
+placeholders); clickhouse says `{name:Type}` instead.
+
+- named parameters only: values are never concatenated or template-interpolated into the SQL
+  text. a `${...}` inside a query is only a fragment assembled from fixed strings (an optional
+  filter, a `VALUES` row list, a shared predicate constant) whose values went into the params
+  object beside it
+- scope by tenant on every tenant-owned table, joined tables included
+  (`ON d.id = t.device_id AND d.sys_group_id = :sysGroupId`), and take the tenant id as an
+  explicit repository argument. a cross-tenant query (global table, fleet-wide analytics) is the
+  deliberate exception; make that obvious from the function name or a comment
+- name the columns you select instead of `SELECT *`; the exception is copying a row forward
+  unchanged (re-inserting into a replacing table), where `*` stops a column added later from
+  being reset to its default
+- bound every list query with `LIMIT`, and end its `ORDER BY` in a unique column so ties don't
+  make pages or cursors skip or repeat rows; a lookup expecting one row says `LIMIT 1`
+- push filters into the query: build optional conditions as a list of fixed strings
+  (`AND ip.ecosystem = :ecosystem`) and add their values to params, rather than fetching
+  broadly and filtering in the caller
+- write in bulk, one statement per batch and never one per row (a row per round trip puts
+  dozens of serial queries on the request path). keep a batch under the driver's bind-parameter
+  limit (postgres: 65535, so chunk a multi-row `VALUES`), or pass parallel arrays and
+  `unnest(:a::text[], :b::int[])` so the parameter count stays flat
+- upserts name their conflict target (`ON CONFLICT (cols) DO UPDATE SET x = EXCLUDED.x`, or
+  `DO NOTHING`). postgres rejects a statement that hits the same row twice, so the caller
+  dedupes the batch first; say so on the function
+- cast aggregates in the query (`count(*)::int`); the driver hands bigint back as a string
+- `RETURNING id` when the caller needs the new id or needs to know a row matched
 
 ## controllers: one route per file
 
