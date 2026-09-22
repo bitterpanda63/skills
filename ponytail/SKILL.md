@@ -178,6 +178,30 @@ you came for.
 - a short guard both routes repeat (a feature-flag check, an auth precondition) is fine
   duplicated across the two files; don't add a wrapper to dedupe three lines
 
+## validation: assert and return, not a declarative schema
+
+for a request body, form, or any other narrow set of mostly-independent per-field checks, an
+explicit assertion call per field reads faster than a declarative schema object describing the
+whole thing at once - each line says exactly what it checks, and there's no schema DSL or its
+edge cases (an `anyOf`-style validator silently coercing `null` to `0` while probing branches in
+some validation-order it owns, not you) sitting between the code and what actually happens.
+
+- `assert*` throws on failure and returns the validated, typed value; `is*` is a pure boolean
+  predicate that never throws - don't blur the two into one function that sometimes throws and
+  sometimes returns false
+- extract the raw field, validate its shape, return it typed - that's the whole shape of the
+  function. one line per field, at the top of the handler, reads like a list of "this field
+  must be X" statements, top to bottom
+- compose narrow checks instead of writing one broad one: assert the raw shape first (a
+  non-empty string, an integer), then run a more specific check on the already-typed value (a
+  real email or url check) - two small steps instead of one function trying to do both
+- this earns its keep for narrow, mostly-independent per-field checks; a deeply cross-field or
+  recursive shape is a different problem, and a real schema/parser library is the better fit
+  there
+- an `assert*`/`is*` helper nobody calls anymore is dead code like any other - don't keep
+  speculative validators around "in case a future field needs them"; add the specific one when
+  a real field needs it, same as any other YAGNI call
+
 ## plans: editable plan.md, not the approval dialog
 
 when a task warrants a written plan, write it to a real `plan.md` (or similar) file in the
