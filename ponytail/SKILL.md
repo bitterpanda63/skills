@@ -150,8 +150,12 @@ test - unit/integration/e2e - and the same coverage style) and match that, rathe
 inventing a new testing approach for this one change.
 
 test *scope* should match the change, not sprawl past it:
-- cover the new behavior and its realistic edge cases, not every theoretically possible
-  input - exhaustiveness for its own sake is a smell, not a virtue
+- exhaustive test cases are for testing locally (run them, check the behavior, don't commit
+  them); committed tests are for regexes, complex logic and very important logic (auth,
+  permissions, money, data loss). a plain route, query or UI change doesn't get a committed
+  test, since it can usually just be tested in prod; when unsure, don't commit it
+- where a test is committed, cover the new behavior and its realistic edge cases, not every
+  theoretically possible input - exhaustiveness for its own sake is a smell, not a virtue
 - don't add tests for pre-existing code the task didn't touch, and don't restructure the
   existing test suite as a side effect of adding new tests
 - if the right-sized test count for a change feels like "a lot," that's usually a sign the
