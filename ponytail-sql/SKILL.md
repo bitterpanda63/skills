@@ -1,6 +1,6 @@
 ---
 name: ponytail-sql
-description: Personal SQL rules - keeping queries (and only queries) in the repository layer and out of controllers, services and stores, how a query is written (named params, tenant scoping, bounded lists, bulk writes, upserts), and defining unique keys together with their table in schema files. Load before writing or reviewing SQL, a repository function, a schema file, or a controller/route handler that touches the database.
+description: Personal SQL rules - keeping queries (and only queries) in the repository layer and out of controllers, services and stores, how a query is written (named params, tenant scoping, bounded lists, bulk writes, preferring plain inserts over ON CONFLICT), and defining unique keys together with their table in schema files. Load before writing or reviewing SQL, a repository function, a schema file, or a controller/route handler that touches the database.
 ---
 
 # ponytail-sql
@@ -52,9 +52,14 @@ placeholders); clickhouse says `{name:Type}` instead.
   dozens of serial queries on the request path). keep a batch under the driver's bind-parameter
   limit (postgres: 65535, so chunk a multi-row `VALUES`), or pass parallel arrays and
   `unnest(:a::text[], :b::int[])` so the parameter count stays flat
-- upserts name their conflict target (`ON CONFLICT (cols) DO UPDATE SET x = EXCLUDED.x`, or
-  `DO NOTHING`). postgres rejects a statement that hits the same row twice, so the caller
-  dedupes the batch first; say so on the function
+- prefer a plain `INSERT` and let a unique index throw over `ON CONFLICT ... DO UPDATE`; when the
+  caller needs to react, split it: a read, then an `INSERT` or `UPDATE` in the caller (catch
+  unique violation `23505`, answer 409). keep `ON CONFLICT` for bulk, idempotent writes
+- when an upsert is warranted, name its conflict target (`ON CONFLICT (cols) DO UPDATE SET x =
+  EXCLUDED.x`, or `DO NOTHING`). postgres rejects a statement that hits the same row twice, so
+  the caller dedupes the batch first; say so on the function
+- never fold a delete into the same statement as the insert (`WITH ... DELETE` + `INSERT`);
+  separate repository functions, sequenced in the caller
 - cast aggregates in the query (`count(*)::int`); the driver hands bigint back as a string
 - `RETURNING id` when the caller needs the new id or needs to know a row matched
 
